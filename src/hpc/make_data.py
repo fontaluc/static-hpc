@@ -82,7 +82,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Hyperparameters dict
-    cf = utils.AttrDict()
+    cf = pcn.utils.AttrDict()
 
     # experiment params
     cf.seed = args.seed
@@ -108,3 +108,5 @@ if __name__ == "__main__":
     cf.act_fn = "tanh"
     cf.kaiming_init = False
     cf.positive = False
+
+    main(cf)

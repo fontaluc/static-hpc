@@ -41,10 +41,10 @@ def main(cf):
     img_train, vc_train, ec_train, labels_train = utils.get_representations(
         train_loader, 
         model, 
-        cf.n_train_iters, 
+        cf.n_max_iters, 
         cf.step_tolerance, 
         cf.init_std, 
-        cf.fixed_preds_train
+        cf.fixed_preds_test
     )
     cifar10_train = {'img': img_train.cpu(), 'vc': vc_train.cpu(), 'ec': ec_train.cpu(), 'labels': labels_train}
     torch.save(cifar10_train, f'data/cifar10_train.pt')
@@ -52,10 +52,10 @@ def main(cf):
     img_valid, vc_valid, ec_valid, labels_valid = utils.get_representations(
         valid_loader, 
         model, 
-        cf.n_train_iters, 
+        cf.n_max_iters, 
         cf.step_tolerance, 
         cf.init_std, 
-        cf.fixed_preds_train
+        cf.fixed_preds_test
     )
     cifar10_valid = {'img': img_valid.cpu(), 'vc': vc_valid.cpu(), 'ec': ec_valid.cpu(), 'labels': labels_valid}
     torch.save(cifar10_valid, f'data/cifar10_valid.pt')
@@ -63,7 +63,7 @@ def main(cf):
     img_test, vc_test, ec_test, labels_test = utils.get_representations(
         test_loader, 
         model, 
-        cf.n_test_iters, 
+        cf.n_max_iters, 
         cf.step_tolerance, 
         cf.init_std, 
         cf.fixed_preds_test
@@ -96,10 +96,9 @@ if __name__ == "__main__":
 
     # inference params
     cf.mu_dt = 0.01
-    cf.n_train_iters = 50
-    cf.n_test_iters = 200
+    cf.n_max_iters = 10000
+    cf.step_tolerance = 1e-5
     cf.init_std = 0.01
-    cf.fixed_preds_train = False
     cf.fixed_preds_test = False
 
     # model params

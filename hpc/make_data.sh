@@ -19,4 +19,4 @@ module load compiler/cuda/12.3
 
 conda activate torch_env
 
-srun python /beegfs/lfontain/static-hpc/src/hpc/experiment.py
+srun python /beegfs/lfontain/static-hpc/src/hpc/make_data.py

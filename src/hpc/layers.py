@@ -6,7 +6,7 @@ import numpy as np
 
 class Layer(nn.Module):
     def __init__(
-        self, in_size, out_size, act_fn, c, glorot_init=False
+        self, in_size, out_size, act_fn, c, glorot_init=False, device=None
     ):
         super().__init__()
         self.in_size = in_size
@@ -18,8 +18,8 @@ class Layer(nn.Module):
         cols = [torch.randperm(self.in_size)[:self.K].unsqueeze(1) for _ in range(self.out_size)]
         self.row_idx = torch.cat(cols, dim=1)
         self.col_idx = torch.arange(self.out_size).repeat(self.K, 1)
-        self.weights = torch.zeros((self.in_size, self.out_size))
-        self.bias = torch.zeros((self.out_size))
+        self.weights = nn.Parameter(torch.empty((self.in_size, self.out_size)), device=device)
+        self.bias = nn.Parameter(torch.empty((self.out_size)), device=device)
         
         self._reset_grad()
 
@@ -27,9 +27,6 @@ class Layer(nn.Module):
             self._reset_params_glorot() 
         else:
             self._reset_params()
-
-        self.weights = nn.Parameter(utils.set_tensor(self.weights))
-        self.bias = nn.Parameter(utils.set_tensor(self.bias))
 
     def _reset_grad(self):
         self.grad = {"weights": None, "bias": None}

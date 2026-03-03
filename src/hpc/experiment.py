@@ -26,7 +26,8 @@ def main(cf):
         out_size=cf.n_dg, 
         act_fn=cf.act_fn,
         c=1,
-        f=cf.f_dg
+        f=cf.f_dg,
+        device=torch.device('cpu')
     )
 
     DG_CA3 = SparseLayer(
@@ -34,7 +35,8 @@ def main(cf):
         out_size=cf.n_ca3, 
         act_fn=cf.act_fn,
         c=1,
-        f=cf.f_ca3
+        f=cf.f_ca3,
+        device=torch.device('cpu')
     )
     
     with torch.no_grad():

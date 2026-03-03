@@ -13,13 +13,14 @@ class Layer(nn.Module):
         self.out_size = out_size
         self.act_fn = act_fn
         self.c = c
+        self.device = device
 
         self.K = int(self.c * self.in_size)
         cols = [torch.randperm(self.in_size)[:self.K].unsqueeze(1) for _ in range(self.out_size)]
         self.row_idx = torch.cat(cols, dim=1)
         self.col_idx = torch.arange(self.out_size).repeat(self.K, 1)
-        self.weights = nn.Parameter(torch.empty((self.in_size, self.out_size)), device=device)
-        self.bias = nn.Parameter(torch.empty((self.out_size)), device=device)
+        self.weights = torch.empty((self.in_size, self.out_size), device=self.device)
+        self.bias = torch.empty((self.out_size), device=self.device)
         
         self._reset_grad()
 
@@ -28,14 +29,17 @@ class Layer(nn.Module):
         else:
             self._reset_params()
 
+        self.weights = nn.Parameter(self.weights)
+        self.bias = nn.Parameter(self.bias)
+
     def _reset_grad(self):
         self.grad = {"weights": None, "bias": None}
 
     def _reset_params(self):
-        self.weights[self.row_idx, self.col_idx] = nn.init.normal_(torch.empty((self.K, self.out_size)), mean=0, std=2/np.sqrt(self.in_size))
+        self.weights[self.row_idx, self.col_idx] = nn.init.normal_(torch.empty((self.K, self.out_size), device=self.device), mean=0, std=2/np.sqrt(self.in_size))
 
     def _reset_params_glorot(self):
-        self.weights[self.row_idx, self.col_idx] = nn.init.xavier_uniform_(torch.empty((self.K, self.out_size)))
+        self.weights[self.row_idx, self.col_idx] = nn.init.xavier_uniform_(torch.empty((self.K, self.out_size), device=self.device))
 
 class SparseLayer(Layer):
     def __init__(
@@ -59,7 +63,7 @@ class SparseLayer(Layer):
             glorot_init,
             device
         )
-        self.in_mean = pcn.utils.set_tensor(in_mean)
+        self.in_mean = pcn.utils.set_tensor(in_mean, self.device)
         self.f = f
         self.k = int(self.f*self.out_size)
         self.use_bias = use_bias
@@ -73,7 +77,7 @@ class SparseLayer(Layer):
             kth_vals = topk_vals[:, -1].unsqueeze(1)
             h = h - kth_vals        
         if self.act_fn == torch.heaviside:
-            out = self.act_fn(h, pcn.utils.set_tensor(torch.zeros(1)))
+            out = self.act_fn(h, pcn.utils.set_tensor(torch.zeros(1), self.device))
         else:
             out = self.act_fn(h)
         return out

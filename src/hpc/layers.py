@@ -48,14 +48,16 @@ class SparseLayer(Layer):
         in_mean = torch.zeros(1),
         use_bias=False,
         delta=False,
-        glorot_init=False
+        glorot_init=False,
+        device=None
     ):
         super().__init__(
             in_size, 
             out_size, 
             act_fn, 
             c,
-            glorot_init
+            glorot_init,
+            device
         )
         self.in_mean = pcn.utils.set_tensor(in_mean)
         self.f = f

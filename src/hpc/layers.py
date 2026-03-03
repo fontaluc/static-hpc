@@ -72,17 +72,11 @@ class SparseLayer(Layer):
         if self.f < 1:
             topk_vals, _ = torch.topk(h, self.k + 1, dim=1)
             kth_vals = topk_vals[:, -1].unsqueeze(1)
-            mask = h <= kth_vals
-        else:
-            mask = torch.zeros_like(h, dtype=torch.bool)
-            kth_vals = torch.zeros_like(h[:, 0]).unsqueeze(1)
+            h = h - kth_vals        
         if self.act_fn == torch.heaviside:
-            out = self.act_fn(h - kth_vals, pcn.utils.set_tensor(torch.zeros(1)))
-        elif self.act_fn == torch.relu:
-            out = self.act_fn(h - kth_vals)
+            out = self.act_fn(h, pcn.utils.set_tensor(torch.zeros(1)))
         else:
             out = self.act_fn(h)
-        out = out * (~mask)
         return out
     
     def update_weights(self, inp, target, out):

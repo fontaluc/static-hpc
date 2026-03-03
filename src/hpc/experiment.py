@@ -13,11 +13,9 @@ def main(cf):
     
     cifar10_train = torch.load(f'data/cifar10_train.pt')
     ec_train = cifar10_train['ec']
-    ec_train = pcn.utils.set_tensor(ec_train)
 
     cifar10_valid = torch.load(f'data/cifar10_valid.pt')
     ec_valid = cifar10_valid['ec']
-    ec_valid = pcn.utils.set_tensor(ec_valid)
 
     pcn.utils.seed(cf.seed)
     g = torch.Generator()

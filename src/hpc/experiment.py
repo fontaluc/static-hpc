@@ -8,6 +8,7 @@ import pcn
 from torch.utils.data import DataLoader, TensorDataset
 import torch.nn as nn
 from hpc import utils
+import numpy as np
 
 def main(cf):
     
@@ -19,79 +20,90 @@ def main(cf):
 
     pcn.utils.seed(cf.seed)
     g = torch.Generator()
-    g.manual_seed(cf.seed)    
+    g.manual_seed(cf.seed)  
 
-    EC_DG = SparseLayer(
-        in_size=cf.n_ec, 
-        out_size=cf.n_dg, 
-        act_fn=cf.act_fn,
-        c=1,
-        f=cf.f_dg,
-        device=torch.device('cpu')
-    )
+    avg_corr = float('nan')
 
-    DG_CA3 = SparseLayer(
-        in_size=cf.n_dg,
-        out_size=cf.n_ca3, 
-        act_fn=cf.act_fn,
-        c=1,
-        f=cf.f_ca3,
-        device=torch.device('cpu')
-    )
-    
-    with torch.no_grad():
-        dg_train = EC_DG(ec_train)
-        ca3_train = DG_CA3(dg_train)
-        dg_valid = EC_DG(ec_valid)
-        ca3_valid = DG_CA3(dg_valid)
+    # Repeat until we get a valid model
+    while np.isnan(avg_corr) or avg_corr == 1:
 
-    # Average correlation
-    ca3 = ca3_train[:cf.N_patterns]
-    indices = torch.triu_indices(cf.N_patterns, cf.N_patterns, offset=1)
-    R = torch.corrcoef(ca3).abs()
-    avg_corr = R[indices[0], indices[1]].mean().item()
+        EC_DG = SparseLayer(
+            in_size=cf.n_ec, 
+            out_size=cf.n_dg, 
+            act_fn=cf.act_fn,
+            c=1,
+            f=cf.f_dg,
+            device=torch.device('cpu')
+        )
 
-    # Validation error
-    
-    train_tensordataset = TensorDataset(ca3_train, ec_train)
-    train_loader = DataLoader(
-        train_tensordataset, 
-        cf.batch_size, 
-        shuffle=True, 
-        worker_init_fn=pcn.utils.seed_worker, 
-        generator=g
-    )
-    valid_tensordataset = TensorDataset(ca3_valid, ec_valid)
-    valid_loader = DataLoader(
-        valid_tensordataset, 
-        cf.batch_size, 
-        shuffle=True, 
-        worker_init_fn=pcn.utils.seed_worker, 
-        generator=g
-    )     
+        DG_CA3 = SparseLayer(
+            in_size=cf.n_dg,
+            out_size=cf.n_ca3, 
+            act_fn=cf.act_fn,
+            c=1,
+            f=cf.f_ca3,
+            device=torch.device('cpu')
+        )
+        
+        with torch.no_grad():
+            dg_train = EC_DG(ec_train)
+            ca3_train = DG_CA3(dg_train)
+            dg_valid = EC_DG(ec_valid)
+            ca3_valid = DG_CA3(dg_valid)
 
-    device = pcn.utils.DEVICE
-    criterion = nn.MSELoss()
-    model = nn.Sequential(
-        nn.Linear(in_features=cf.n_ca3, out_features=cf.n_ca1),
-        nn.ReLU(), 
-        nn.Linear(in_features=cf.n_ca1, out_features=cf.n_ec),
-        nn.Tanh()
-    ).to(device)
+        # Average correlation
+        ca3 = ca3_train[:cf.N_patterns]
+        indices = torch.triu_indices(cf.N_patterns, cf.N_patterns, offset=1)
+        R = torch.corrcoef(ca3).abs()
+        #print(R)
+        avg_corr = R[indices[0], indices[1]].mean().item()
+        #print(avg_corr)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=cf.lr)
-    
-    errors_train, errors_valid = utils.train_model(
-        model, 
-        train_loader, 
-        valid_loader, 
-        optimizer, 
-        criterion, 
-        device,
-        lambda_reg=cf.lambda_reg,  
-        n_epochs=cf.n_epochs)
-    
-    valid_error = min(errors_valid)
+        # We already know the model is invalid if the following conditions are satisfied
+        if np.isnan(avg_corr) or avg_corr == 1:
+            continue
+
+        # Validation error
+        
+        train_tensordataset = TensorDataset(ca3_train, ec_train)
+        train_loader = DataLoader(
+            train_tensordataset, 
+            cf.batch_size, 
+            shuffle=True, 
+            worker_init_fn=pcn.utils.seed_worker, 
+            generator=g
+        )
+        valid_tensordataset = TensorDataset(ca3_valid, ec_valid)
+        valid_loader = DataLoader(
+            valid_tensordataset, 
+            cf.batch_size, 
+            shuffle=True, 
+            worker_init_fn=pcn.utils.seed_worker, 
+            generator=g
+        )     
+
+        device = pcn.utils.DEVICE
+        criterion = nn.MSELoss()
+        model = nn.Sequential(
+            nn.Linear(in_features=cf.n_ca3, out_features=cf.n_ca1),
+            nn.ReLU(), 
+            nn.Linear(in_features=cf.n_ca1, out_features=cf.n_ec),
+            nn.Tanh()
+        ).to(device)
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=cf.lr)
+        
+        errors_train, errors_valid = utils.train_model(
+            model, 
+            train_loader, 
+            valid_loader, 
+            optimizer, 
+            criterion, 
+            device,
+            lambda_reg=cf.lambda_reg,  
+            n_epochs=cf.n_epochs)
+        
+        valid_error = min(errors_valid)
 
     # Lock file to prevent overwriting when multiple processes run
     with FileLock(f"sparsity_experiments.csv.lock"):

@@ -47,7 +47,7 @@ def main(cf):
         cf.fixed_preds_test
     )
     cifar10_train = {'img': img_train.cpu(), 'vc': vc_train.cpu(), 'ec': ec_train.cpu(), 'labels': labels_train}
-    torch.save(cifar10_train, f'data/cifar10_train.pt')
+    torch.save(cifar10_train, f'data/{cf.dataset}_train.pt')
 
     img_valid, vc_valid, ec_valid, labels_valid = utils.get_representations(
         valid_loader, 
@@ -58,7 +58,7 @@ def main(cf):
         cf.fixed_preds_test
     )
     cifar10_valid = {'img': img_valid.cpu(), 'vc': vc_valid.cpu(), 'ec': ec_valid.cpu(), 'labels': labels_valid}
-    torch.save(cifar10_valid, f'data/cifar10_valid.pt')
+    torch.save(cifar10_valid, f'data/{cf.dataset}_valid.pt')
 
     img_test, vc_test, ec_test, labels_test = utils.get_representations(
         test_loader, 
@@ -69,7 +69,7 @@ def main(cf):
         cf.fixed_preds_test
     )
     cifar10_test = {'img': img_test.cpu(), 'vc': vc_test.cpu(), 'ec': ec_test.cpu(), 'labels': labels_test}
-    torch.save(cifar10_test, f'data/cifar10_test.pt')
+    torch.save(cifar10_test, f'data/{cf.dataset}_test.pt')
 
 
 if __name__ == "__main__":

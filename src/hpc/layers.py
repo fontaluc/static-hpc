@@ -6,7 +6,7 @@ import numpy as np
 
 class Layer(nn.Module):
     def __init__(
-        self, in_size, out_size, act_fn, c, glorot_init=False, device=None
+        self, in_size, out_size, act_fn, c, glorot_init=False, device=utils.DEVICE
     ):
         super().__init__()
         self.in_size = in_size
@@ -20,7 +20,8 @@ class Layer(nn.Module):
         self.row_idx = torch.cat(cols, dim=1)
         self.col_idx = torch.arange(self.out_size).repeat(self.K, 1)
         self.weights = torch.empty((self.in_size, self.out_size), device=self.device)
-        self.bias = torch.empty((self.out_size), device=self.device)
+        # always create a bias tensor but initialize to zero unless user chooses otherwise
+        self.bias = torch.zeros((self.out_size), device=self.device)
         
         self._reset_grad()
 
@@ -53,7 +54,7 @@ class SparseLayer(Layer):
         use_bias=False,
         delta=False,
         glorot_init=False,
-        device=None
+        device=utils.DEVICE
     ):
         super().__init__(
             in_size, 
@@ -63,21 +64,24 @@ class SparseLayer(Layer):
             glorot_init,
             device
         )
-        self.in_mean = pcn.utils.set_tensor(in_mean, self.device)
+        self.in_mean = utils.set_tensor(in_mean, self.device)
         self.f = f
         self.k = int(self.f*self.out_size)
         self.use_bias = use_bias
         self.delta = delta
 
     def forward(self, inp):
-        h = torch.matmul(inp, self.weights) + self.bias
+        # compute linear response; optionally add bias
+        h = torch.matmul(inp, self.weights)
+        if self.use_bias:
+            h = h + self.bias
         # kWTA: keep only top-k activations per row
         if self.f < 1:
             topk_vals, _ = torch.topk(h, self.k + 1, dim=1)
             kth_vals = topk_vals[:, -1].unsqueeze(1)
             h = h - kth_vals        
         if self.act_fn == torch.heaviside:
-            out = self.act_fn(h, pcn.utils.set_tensor(torch.zeros(1), self.device))
+            out = self.act_fn(h, utils.set_tensor(torch.zeros(1), self.device))
         else:
             out = self.act_fn(h)
         return out

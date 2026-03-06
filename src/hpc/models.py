@@ -1,4 +1,5 @@
 from torch import nn
+import torch
 from hpc.layers import SparseLayer
 import numpy as np
 import pcn
@@ -72,6 +73,28 @@ class PATrainer(object):
             preds = self.model(inputs)
             errors.append(self.criterion(preds, targets).item())
         return errors
+    
+class AutoEncoder(nn.Module):
+    def __init__(self, num_features, latent_features, k):
+        super(AutoEncoder, self).__init__()
+        self.k = k
+        self.encoder = nn.Linear(in_features=num_features, out_features=latent_features, bias=False)
+        self.decoder = nn.Linear(in_features=latent_features, out_features=num_features)
+
+    def apply_inhibition(self, z):
+        topk_vals, _ = torch.topk(z, self.k + 1, dim=1)
+        kth_vals = topk_vals[:, -1].unsqueeze(1)
+        return torch.relu(z - kth_vals)
+
+    def forward(self, x): 
+        z = self.apply_inhibition(self.encoder(x))
+        # apply tanh to output to get EC activity between -1 and 1
+        x_hat = torch.tanh(self.decoder(z))
+        
+        return {
+            'z': z,
+            'x_hat': x_hat
+        }
 
 class SparseHopfieldNetwork:
     """Base class for our Hopfield Network (Modern) Hopfield Network"""

@@ -1,11 +1,16 @@
-import math
-
+from sklearn.decomposition import PCA
 import torch
 from hpc.models import PatternAssociator, PATrainer
 import pcn
 import numpy as np
 import torch.nn as nn
 from tqdm import tqdm
+from torch import Tensor
+import matplotlib.pyplot as plt
+from typing import *
+from IPython.display import Image, display, clear_output
+import os
+import seaborn as sns
 
 def best_lr(lrs, train_loader, test_loader, in_size, out_size, in_mean, act_fn, use_bias, delta, f, c=1, num_patterns=20):
     mean_errors = []
@@ -141,3 +146,76 @@ def train_model(model, train_loader, valid_loader, optimizer, criterion, device,
                 f"Epoch [{(epoch + 1):3}/{n_epochs:3}] finished. Training loss: {mean_loss:.5f}. Validation loss: {mean_loss_valid:.5f}."
             )
     return errors_train, errors_valid
+
+def dimensionality(X):
+    # Use PCA to determine the number of dimensions needed to explain 90% of the variance in the data
+    pca = PCA()
+    pca.fit(X)
+    cumsum = pca.explained_variance_ratio_.cumsum()
+    return min(np.where(cumsum > 0.9)[0]).item() + 1
+
+def plot_autoencoder_stats(
+        x: Tensor = None,
+        x_hat: Tensor = None,
+        z: Tensor = None,
+        y: Tensor = None,
+        epoch: int = None,
+        train_loss: List = None,
+        valid_loss: List = None,
+        classes: List = None,
+        dimensionality_reduction_op: Optional[Callable] = None,
+        size: Tuple = None
+) -> None:
+    """
+    An utility 
+    """
+    # -- Plotting --
+    f, axarr = plt.subplots(2, 2, figsize=(20, 20))
+
+    # Loss
+    ax = axarr[0, 0]
+    ax.set_title("Error")
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Error')
+
+    ax.plot(np.arange(epoch + 1), train_loss, color="black")
+    ax.plot(np.arange(epoch + 1), valid_loss, color="gray", linestyle="--")
+    ax.legend(['Training error', 'Validation error'])
+
+    # Latent space
+    ax = axarr[0, 1]
+
+    ax.set_title('Latent space')
+    ax.set_xlabel('Dimension 1')
+    ax.set_ylabel('Dimension 2')
+
+    # If you want to use a dimensionality reduction method you can use
+    # for example TSNE by projecting on two principal dimensions
+    # TSNE.fit_transform(z)
+    if dimensionality_reduction_op is not None:
+        z = dimensionality_reduction_op(z)
+
+    palette = sns.color_palette()
+    for c in classes:
+        ax.scatter(*z[y.numpy() == c].T, c=palette[int(c)], marker='o')
+
+    ax.legend(classes)
+
+    # Inputs
+    ax = axarr[1, 0]
+    ax.set_title('Inputs')
+    pcn.plotting.plot_samples(ax, x, size=size)
+
+    # Reconstructions
+    ax = axarr[1, 1]
+    ax.set_title('Reconstructions')
+    pcn.plotting.plot_samples(ax, x_hat, size=size)
+
+    tmp_img = "tmp_ae_out.png"
+    plt.savefig(tmp_img)
+    plt.close(f)
+    clear_output(wait=True)
+    display(Image(filename=tmp_img))
+    
+
+    os.remove(tmp_img)

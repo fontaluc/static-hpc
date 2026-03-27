@@ -24,7 +24,7 @@ def main(cf):
     test_loader = datasets.get_dataloader(test_dataset, cf.batch_size, pcn.utils.seed_worker, g)
 
     if cf.dataset == 'mnist':
-        cf.n_vc = 450
+        cf.n_vc = 550
     elif cf.dataset == 'fmnist':
         cf.n_vc = 750
     else:

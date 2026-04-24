@@ -12,39 +12,63 @@ from IPython.display import Image, display, clear_output
 import os
 import seaborn as sns
 
-def best_lr(lrs, train_loader, test_loader, in_size, out_size, in_mean, act_fn, use_bias, delta, f, c=1, num_patterns=20):
-    mean_errors = []
-    min_error = float('inf')
+def best_lr(
+        lrs, 
+        train_loader, 
+        test_loader, 
+        in_size, 
+        out_size, 
+        in_mean, 
+        act_fn, 
+        use_bias, 
+        f, 
+        c=1, 
+        glorot_init=True, 
+        n_epochs=1, 
+        n_seeds=5):
+    
+    mean_errors = torch.zeros((n_seeds, len(lrs)))   
+
     with torch.no_grad():
-        for lr in lrs:
+        for seed in tqdm(range(n_seeds)):
+            pcn.utils.seed(seed)
+            g = torch.Generator()
+            g.manual_seed(seed)
+
+            min_error = float('inf')
+
             model = PatternAssociator(
-                in_size=in_size, 
-                in_mean=in_mean,
-                out_size=out_size, 
-                act_fn=act_fn, 
-                use_bias=use_bias, 
-                c=c, 
-                f=f, 
-                delta=delta,
-                glorot_init=True
-            )
-            optimizer = pcn.optim.get_optim(
-                        [model.layer],
-                        "SGD",
-                        lr,
-                        batch_scale=True,
-                        grad_clip=None,
-                        weight_decay=None
-                    )
-            trainer = PATrainer(model, optimizer, nn.MSELoss())
-            trainer.train(train_loader, 0)
-            errors = trainer.test(test_loader)
-            mean_error = np.mean(errors)
-            if mean_error < min_error:
-                min_error = mean_error
-                argmin = lr
-            mean_errors.append(mean_error)
-    return (argmin, min_error), mean_errors
+                    in_size=in_size, 
+                    in_mean=in_mean,
+                    out_size=out_size, 
+                    act_fn=act_fn, 
+                    use_bias=use_bias, 
+                    c=c, 
+                    f=f, 
+                    glorot_init=glorot_init
+                )
+            
+            for i, lr in enumerate(lrs):                
+                optimizer = pcn.optim.get_optim(
+                            [model.layer],
+                            "SGD",
+                            lr,
+                            batch_scale=True,
+                            grad_clip=None,
+                            weight_decay=None
+                )
+                trainer = PATrainer(model, optimizer, nn.MSELoss())
+
+                for epoch in range(n_epochs):
+                    trainer.train(train_loader, epoch)
+
+                errors = trainer.test(test_loader)
+                mean_error = np.mean(errors)
+                if mean_error < min_error:
+                    min_error = mean_error
+                mean_errors[seed, i] = mean_error            
+
+    return mean_errors
 
 def get_representations(data_loader, model, n_max_iters, step_tolerance, init_std, fixed_preds_test):
     img = []

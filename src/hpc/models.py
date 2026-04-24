@@ -12,11 +12,10 @@ import copy
 plt.rcParams["animation.html"] = "jshtml"
     
 class PatternAssociator(nn.Module):
-    def __init__(self, in_size, in_mean, out_size, act_fn, use_bias, c, f, delta, glorot_init=False):
+    def __init__(self, in_size, in_mean, out_size, act_fn, use_bias, c, f, glorot_init=False):
         super().__init__()
         self.in_size = in_size
         self.out_size = out_size
-        self.delta = delta
 
         self.layer = SparseLayer(
             in_size=in_size,
@@ -26,7 +25,6 @@ class PatternAssociator(nn.Module):
             c=c,
             f=f,
             use_bias=use_bias,
-            delta=delta,
             glorot_init=glorot_init
         )
 
@@ -35,10 +33,11 @@ class PatternAssociator(nn.Module):
         return x
 
 class PATrainer(object):
-    def __init__(self, model, optimizer, criterion=nn.MSELoss()):
+    def __init__(self, model, optimizer, criterion=nn.MSELoss(), supervised=True):
         self.model = model
         self.optimizer = optimizer
         self.criterion = criterion
+        self.supervised = supervised
 
     def train(self, data_loader, epoch):
         n_batches = len(data_loader)
@@ -48,15 +47,19 @@ class PATrainer(object):
             inputs = pcn.utils.set_tensor(inputs)
             targets = pcn.utils.set_tensor(targets)
             preds = self.model(inputs)
-            self.model.layer.update_weights(targets)
+            if self.supervised:
+                self.model.layer.update_weights(targets, preds)
+                error += self.criterion(preds, targets).item()
+            else:
+                self.model.layer.update_weights(preds)
             self.optimizer.step(
                     curr_epoch=epoch,
                     curr_batch=batch_id,
                     n_batches=n_batches,
                     batch_size=batch_size,
                     log=False
-                )
-            error += self.criterion(preds, targets).item()
+            )
+            
         return error/n_batches
     
     def eval(self, inputs, targets):
@@ -87,11 +90,13 @@ class AutoEncoder(nn.Module):
         return torch.relu(z - kth_vals)
 
     def forward(self, x): 
-        z = self.apply_inhibition(self.encoder(x))
+        h = self.encoder(x)
+        z = self.apply_inhibition(h)
         # apply tanh to output to get EC activity between -1 and 1
         x_hat = torch.tanh(self.decoder(z))
         
         return {
+            'h': h,
             'z': z,
             'x_hat': x_hat
         }

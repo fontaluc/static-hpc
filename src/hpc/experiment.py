@@ -12,10 +12,10 @@ import numpy as np
 
 def main(cf):
     
-    cifar10_train = torch.load(f'data/cifar10_train.pt')
+    cifar10_train = torch.load(f'data/{cf.dataset}_train.pt')
     ec_train = cifar10_train['ec']
 
-    cifar10_valid = torch.load(f'data/cifar10_valid.pt')
+    cifar10_valid = torch.load(f'data/{cf.dataset}_valid.pt')
     ec_valid = cifar10_valid['ec']
 
     pcn.utils.seed(cf.seed)
@@ -53,7 +53,7 @@ def main(cf):
     avg_corr = R[indices[0], indices[1]].mean().item()
 
     # Dimensionality
-    n_dims = utils.dimensionality(ca3_train)
+    # n_dims = utils.dimensionality(ca3_train)
 
     # Validation error        
     train_tensordataset = TensorDataset(ca3_train, ec_train)
@@ -97,21 +97,22 @@ def main(cf):
     valid_error = min(errors_valid)
 
     # Lock file to prevent overwriting when multiple processes run
-    with FileLock(f"experiments.csv.lock"):
+    with FileLock(f"experiments-{cf.dataset}.csv.lock"):
         print('Lock acquired.')
-        data = [cf.f_dg, cf.f_ca3, avg_corr, valid_error, n_dims]
-        if os.path.exists("outputs/experiments.csv"):
-            df = pd.read_csv("outputs/experiments.csv")
+        data = [cf.f_dg, cf.f_ca3, avg_corr, valid_error]
+        if os.path.exists(f"outputs/experiments-{cf.dataset}.csv"):
+            df = pd.read_csv(f"outputs/experiments-{cf.dataset}.csv")
             df.loc[len(df)] = data
         else:
-            df = pd.DataFrame([data], columns=['DG sparsity', 'CA3 sparsity', 'Average correlation', 'Validation error', 'Dimensionality'])
-        df.to_csv('outputs/experiments.csv', index=False)
+            df = pd.DataFrame([data], columns=['DG sparsity', 'CA3 sparsity', 'Average correlation', 'Validation error'])
+        df.to_csv(f"outputs/experiments-{cf.dataset}.csv", index=False)
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         description="Script that evaluate the PC model according to different metrics to choose the right number of EC units"
     )
+    parser.add_argument("--dataset", type=str, default="mnist", help="Enter dataset name")
     parser.add_argument("--f_dg", type=float, default=0.01, help="Enter DG sparsity")
     parser.add_argument("--f_ca3", type=float, default=0.06, help="Enter CA3 sparsity")
     parser.add_argument("--lr", type=float, default=1e-4, help="Enter learning rate")

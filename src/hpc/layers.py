@@ -52,7 +52,6 @@ class SparseLayer(Layer):
         f,
         in_mean = torch.zeros(1),
         use_bias=False,
-        delta=False,
         glorot_init=False,
         device=utils.DEVICE
     ):
@@ -68,28 +67,45 @@ class SparseLayer(Layer):
         self.f = f
         self.k = int(self.f*self.out_size)
         self.use_bias = use_bias
-        self.delta = delta
+        self.inp = None
+        self.out = None
+
+    def apply_inhibition(self, h):
+        if self.act_fn == torch.heaviside or self.act_fn == torch.relu:
+            topk_vals, _ = torch.topk(h, self.k + 1, dim=1)
+            kth_vals = topk_vals[:, -1].unsqueeze(1)
+            h = h - kth_vals
+
+            if self.act_fn == torch.heaviside:
+                z = self.act_fn(h, utils.set_tensor(torch.zeros(1), self.device))
+            else:
+                z = self.act_fn(h)
+        else:
+            z = self.act_fn(h)
+            topk_vals, topk_idx = torch.topk(z, self.k, dim=1)
+            z = torch.zeros_like(h)
+            z.scatter_(1, topk_idx, topk_vals)
+        return z
+
 
     def forward(self, inp):
+        self.inp = inp.clone()
         # compute linear response; optionally add bias
         h = torch.matmul(inp, self.weights)
         if self.use_bias:
             h = h + self.bias
         # kWTA: keep only top-k activations per row
         if self.f < 1:
-            topk_vals, _ = torch.topk(h, self.k + 1, dim=1)
-            kth_vals = topk_vals[:, -1].unsqueeze(1)
-            h = h - kth_vals        
-        if self.act_fn == torch.heaviside:
-            out = self.act_fn(h, utils.set_tensor(torch.zeros(1), self.device))
+            self.out = self.apply_inhibition(h)
         else:
-            out = self.act_fn(h)
-        return out
+            self.out = self.act_fn(h)
+
+        return self.out
     
-    def update_weights(self, inp, target, out):
+    def update_weights(self, target, pred=None):
         y = target
-        if self.delta:
-            y = y - out
-        self.grad["weights"] = torch.matmul((inp - self.in_mean).T, y)
+        if pred is not None:
+            y = y - pred
+        self.grad["weights"] = torch.matmul((self.inp - self.in_mean).T, y)
         if self.use_bias:
             self.grad["bias"] = torch.sum(y, axis=0)

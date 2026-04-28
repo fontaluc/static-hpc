@@ -12,11 +12,11 @@ import numpy as np
 
 def main(cf):
     
-    cifar10_train = torch.load(f'data/{cf.dataset}_train.pt')
-    ec_train = cifar10_train['ec']
+    dataset_train = torch.load(f'data/{cf.dataset}_train.pt')
+    ec_train = dataset_train['ec']
 
-    cifar10_valid = torch.load(f'data/{cf.dataset}_valid.pt')
-    ec_valid = cifar10_valid['ec']
+    dataset_valid = torch.load(f'data/{cf.dataset}_valid.pt')
+    ec_valid = dataset_valid['ec']
 
     pcn.utils.seed(cf.seed)
     g = torch.Generator()
@@ -122,6 +122,8 @@ if __name__ == "__main__":
 
     # Hyperparameters dict
     cf = pcn.utils.AttrDict()
+
+    cf.dataset = args.dataset
 
     cf.seed = args.seed
     cf.n_ec = 300
